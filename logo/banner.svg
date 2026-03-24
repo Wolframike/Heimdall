@@ -1,0 +1,113 @@
+<svg viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <!-- Base background gradient -->
+        <linearGradient id="bgBase" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#050d18" />
+            <stop offset="40%" stop-color="#0c1929" />
+            <stop offset="70%" stop-color="#1e3a5f" />
+            <stop offset="100%" stop-color="#0f172a" />
+        </linearGradient>
+        <!-- Center glow -->
+        <radialGradient id="glow1" cx="50%" cy="50%" r="45%">
+            <stop offset="0%" stop-color="#1e40af" stop-opacity="0.35" />
+            <stop offset="100%" stop-color="#1e40af" stop-opacity="0" />
+        </radialGradient>
+        <!-- Left accent glow -->
+        <radialGradient id="glow2" cx="15%" cy="60%" r="30%">
+            <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.15" />
+            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0" />
+        </radialGradient>
+        <!-- Right accent glow -->
+        <radialGradient id="glow3" cx="85%" cy="35%" r="28%">
+            <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.12" />
+            <stop offset="100%" stop-color="#60a5fa" stop-opacity="0" />
+        </radialGradient>
+        <!-- Top edge highlight -->
+        <linearGradient id="topEdge" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#93c5fd" stop-opacity="0" />
+            <stop offset="30%" stop-color="#3b82f6" stop-opacity="0.6" />
+            <stop offset="50%" stop-color="#7dd3fc" stop-opacity="0.8" />
+            <stop offset="70%" stop-color="#3b82f6" stop-opacity="0.6" />
+            <stop offset="100%" stop-color="#93c5fd" stop-opacity="0" />
+        </linearGradient>
+        <!-- Bottom edge highlight -->
+        <linearGradient id="bottomEdge" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1e40af" stop-opacity="0" />
+            <stop offset="40%" stop-color="#1e40af" stop-opacity="0.4" />
+            <stop offset="60%" stop-color="#2563eb" stop-opacity="0.5" />
+            <stop offset="100%" stop-color="#1e40af" stop-opacity="0" />
+        </linearGradient>
+    </defs>
+    <!-- Base fill -->
+    <rect width="1200" height="400" fill="url(#bgBase)" />
+    <!-- Layered glows for depth -->
+    <rect width="1200" height="400" fill="url(#glow1)" />
+    <rect width="1200" height="400" fill="url(#glow2)" />
+    <rect width="1200" height="400" fill="url(#glow3)" />
+
+    <!-- Scattered piano keys — white keys (tall, narrow rectangles) -->
+    <!-- Far left cluster, tilted right -->
+    <rect x="30" y="-20" width="18" height="140" rx="2" fill="#1e40af" opacity="0.07" transform="rotate(12, 39, 50)" />
+    <rect x="55" y="-10" width="18" height="160" rx="2" fill="#1e40af" opacity="0.05" transform="rotate(8, 64, 70)" />
+    <rect x="80" y="-30" width="18" height="130" rx="2" fill="#2563eb" opacity="0.06" transform="rotate(15, 89, 35)" />
+    <!-- Black keys nestled in -->
+    <rect x="46" y="-15" width="10" height="90" rx="1" fill="#3b82f6" opacity="0.09" transform="rotate(10, 51, 30)" />
+    <rect x="73" y="-25" width="10" height="80" rx="1" fill="#60a5fa" opacity="0.07" transform="rotate(13, 78, 15)" />
+
+    <!-- Left-center, drifting down -->
+    <rect x="180" y="60" width="20" height="170" rx="2" fill="#1e40af" opacity="0.06" transform="rotate(-5, 190, 145)" />
+    <rect x="205" y="40" width="20" height="190" rx="2" fill="#2563eb" opacity="0.04" transform="rotate(-8, 215, 135)" />
+    <rect x="230" y="70" width="20" height="160" rx="2" fill="#1e40af" opacity="0.07" transform="rotate(-3, 240, 150)" />
+    <rect x="255" y="50" width="20" height="180" rx="2" fill="#1e3a5f" opacity="0.05" transform="rotate(-6, 265, 140)" />
+    <!-- Black keys -->
+    <rect x="197" y="65" width="11" height="100" rx="1" fill="#3b82f6" opacity="0.08" transform="rotate(-6, 202, 115)" />
+    <rect x="245" y="75" width="11" height="95" rx="1" fill="#60a5fa" opacity="0.06" transform="rotate(-4, 250, 122)" />
+
+    <!-- Center-left, floating up -->
+    <rect x="370" y="180" width="22" height="200" rx="2" fill="#2563eb" opacity="0.05" transform="rotate(18, 381, 280)" />
+    <rect x="400" y="160" width="22" height="220" rx="2" fill="#1e40af" opacity="0.07" transform="rotate(14, 411, 270)" />
+    <rect x="430" y="190" width="22" height="190" rx="2" fill="#1e3a5f" opacity="0.06" transform="rotate(20, 441, 285)" />
+    <!-- Black keys -->
+    <rect x="392" y="185" width="12" height="120" rx="1" fill="#3b82f6" opacity="0.08" transform="rotate(16, 398, 245)" />
+    <rect x="424" y="195" width="12" height="110" rx="1" fill="#7dd3fc" opacity="0.06" transform="rotate(18, 430, 250)" />
+
+    <!-- Dead center, large and prominent -->
+    <rect x="530" y="30" width="24" height="220" rx="2" fill="#1e40af" opacity="0.08" transform="rotate(-2, 542, 140)" />
+    <rect x="560" y="10" width="24" height="250" rx="2" fill="#2563eb" opacity="0.06" transform="rotate(3, 572, 135)" />
+    <rect x="590" y="40" width="24" height="210" rx="2" fill="#1e40af" opacity="0.09" transform="rotate(-4, 602, 145)" />
+    <rect x="620" y="20" width="24" height="240" rx="2" fill="#1e3a5f" opacity="0.05" transform="rotate(1, 632, 140)" />
+    <rect x="650" y="50" width="24" height="200" rx="2" fill="#2563eb" opacity="0.07" transform="rotate(-3, 662, 150)" />
+    <!-- Black keys -->
+    <rect x="550" y="35" width="13" height="140" rx="1" fill="#3b82f6" opacity="0.1" transform="rotate(1, 556, 105)" />
+    <rect x="583" y="45" width="13" height="130" rx="1" fill="#60a5fa" opacity="0.08" transform="rotate(-2, 589, 110)" />
+    <rect x="640" y="25" width="13" height="145" rx="1" fill="#7dd3fc" opacity="0.07" transform="rotate(2, 646, 97)" />
+
+    <!-- Right-center, angled cluster -->
+    <rect x="750" y="120" width="20" height="180" rx="2" fill="#1e40af" opacity="0.06" transform="rotate(-15, 760, 210)" />
+    <rect x="778" y="100" width="20" height="200" rx="2" fill="#2563eb" opacity="0.05" transform="rotate(-18, 788, 200)" />
+    <rect x="806" y="130" width="20" height="170" rx="2" fill="#1e3a5f" opacity="0.07" transform="rotate(-12, 816, 215)" />
+    <rect x="834" y="110" width="20" height="190" rx="2" fill="#1e40af" opacity="0.04" transform="rotate(-16, 844, 205)" />
+    <!-- Black keys -->
+    <rect x="770" y="125" width="11" height="110" rx="1" fill="#3b82f6" opacity="0.08" transform="rotate(-16, 775, 180)" />
+    <rect x="826" y="135" width="11" height="100" rx="1" fill="#60a5fa" opacity="0.06" transform="rotate(-13, 831, 185)" />
+
+    <!-- Right side, tilted left -->
+    <rect x="940" y="200" width="18" height="160" rx="2" fill="#2563eb" opacity="0.06" transform="rotate(22, 949, 280)" />
+    <rect x="965" y="180" width="18" height="180" rx="2" fill="#1e40af" opacity="0.08" transform="rotate(25, 974, 270)" />
+    <rect x="990" y="210" width="18" height="150" rx="2" fill="#1e3a5f" opacity="0.05" transform="rotate(20, 999, 285)" />
+    <!-- Black keys -->
+    <rect x="957" y="205" width="10" height="100" rx="1" fill="#3b82f6" opacity="0.07" transform="rotate(23, 962, 255)" />
+
+    <!-- Far right, fading out -->
+    <rect x="1080" y="60" width="18" height="150" rx="2" fill="#1e40af" opacity="0.05" transform="rotate(-10, 1089, 135)" />
+    <rect x="1105" y="40" width="18" height="170" rx="2" fill="#2563eb" opacity="0.04" transform="rotate(-7, 1114, 125)" />
+    <rect x="1130" y="70" width="18" height="140" rx="2" fill="#1e3a5f" opacity="0.06" transform="rotate(-12, 1139, 140)" />
+    <!-- Black keys -->
+    <rect x="1098" y="65" width="10" height="90" rx="1" fill="#60a5fa" opacity="0.05" transform="rotate(-8, 1103, 110)" />
+    <rect x="1125" y="75" width="10" height="85" rx="1" fill="#3b82f6" opacity="0.04" transform="rotate(-11, 1130, 117)" />
+
+    <!-- Top highlight line -->
+    <rect x="0" y="0" width="1200" height="2" fill="url(#topEdge)" />
+    <!-- Bottom highlight line -->
+    <rect x="0" y="398" width="1200" height="2" fill="url(#bottomEdge)" />
+</svg>

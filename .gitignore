@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+venv/
+.clasp.json
+
+# Build outputs
+dist/
+.next/
+__pycache__/
+
+# Environment / secrets
+.env*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor config
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# AI orchestration files
+CLAUDE.md
+GEMINI.md
+MASTER.md
+PLAN.md
+PLAN_PROMPT.md
+
+# Claude Code
+.claude/

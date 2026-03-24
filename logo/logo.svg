@@ -1,0 +1,57 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <!-- Background radial gradient -->
+        <radialGradient id="bgGrad" cx="50%" cy="45%" r="55%">
+            <stop offset="0%" stop-color="#1e3a5f" />
+            <stop offset="60%" stop-color="#0c1929" />
+            <stop offset="100%" stop-color="#050d18" />
+        </radialGradient>
+        <!-- Shield fill gradient (top to bottom) -->
+        <linearGradient id="shieldGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1e40af" />
+            <stop offset="50%" stop-color="#0f172a" />
+            <stop offset="100%" stop-color="#1e3a5f" />
+        </linearGradient>
+        <!-- Shield stroke gradient -->
+        <linearGradient id="strokeGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#93c5fd" />
+            <stop offset="50%" stop-color="#3b82f6" />
+            <stop offset="100%" stop-color="#7dd3fc" />
+        </linearGradient>
+        <!-- White keys gradient (top to bottom) -->
+        <linearGradient id="whiteKeyGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2563eb" />
+            <stop offset="100%" stop-color="#1e40af" />
+        </linearGradient>
+        <!-- Black keys gradient -->
+        <linearGradient id="blackKeyGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#60a5fa" />
+            <stop offset="100%" stop-color="#3b82f6" />
+        </linearGradient>
+        <!-- Helmet gradient -->
+        <linearGradient id="helmetGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#60a5fa" />
+            <stop offset="50%" stop-color="#93c5fd" />
+            <stop offset="100%" stop-color="#60a5fa" />
+        </linearGradient>
+    </defs>
+    <!-- Background -->
+    <rect width="100" height="100" fill="url(#bgGrad)" />
+    <!-- Subtle glow behind shield -->
+    <ellipse cx="50" cy="55" rx="30" ry="35" fill="#1d4ed8" opacity="0.12" />
+    <!-- Shield Outline -->
+    <path d="M50,95 C20,80 15,30 15,30 L50,10 L85,30 C85,30 80,80 50,95 Z" fill="url(#shieldGrad)" stroke="url(#strokeGrad)" stroke-width="2" />
+    <!-- Helmet Lines Inside -->
+    <path d="M25,40 L50,25 L75,40" fill="none" stroke="url(#helmetGrad)" stroke-width="2" />
+    <!-- Piano: white keys with perspective -->
+    <rect x="32" y="50" width="7" height="26" fill="url(#whiteKeyGrad)" stroke="#0f172a" stroke-width="0.5" />
+    <rect x="39" y="48" width="7" height="30" fill="url(#whiteKeyGrad)" stroke="#0f172a" stroke-width="0.5" />
+    <rect x="46" y="46" width="8" height="34" fill="url(#whiteKeyGrad)" stroke="#0f172a" stroke-width="0.5" />
+    <rect x="54" y="48" width="7" height="30" fill="url(#whiteKeyGrad)" stroke="#0f172a" stroke-width="0.5" />
+    <rect x="61" y="50" width="7" height="26" fill="url(#whiteKeyGrad)" stroke="#0f172a" stroke-width="0.5" />
+    <!-- Black keys -->
+    <rect x="37" y="49" width="4" height="16" fill="url(#blackKeyGrad)" />
+    <rect x="44" y="47" width="4.5" height="18" fill="url(#blackKeyGrad)" />
+    <rect x="52" y="47" width="4.5" height="18" fill="url(#blackKeyGrad)" />
+    <rect x="59" y="49" width="4" height="16" fill="url(#blackKeyGrad)" />
+</svg>
