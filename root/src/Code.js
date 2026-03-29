@@ -1,3 +1,6 @@
+// ===== Heimdall v2 =====
+// Room lock management LINE bot — Google Apps Script + Google Sheets
+
 // ===== Configuration =====
 var LINE_CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty("LINE_CHANNEL_ACCESS_TOKEN");
 var LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
@@ -6,57 +9,48 @@ var LINE_PROFILE_URL = "https://api.line.me/v2/bot/profile/";
 
 // ===== Defaults =====
 var DEFAULT_REMINDER_MINUTES = 180;
-var LOG_DEFAULT_COUNT = 5;
-var LOG_MAX_COUNT = 50;
+var DEFAULT_LOG_COUNT = 5;
+var DEFAULT_LOG_MAX = 50;
 var DATA_LOG_START_ROW = 4;
 var FALLBACK_DISPLAY_NAME = "不明";
 var TIMESTAMP_FORMAT = "MM/dd HH:mm";
 
 // ===== Theme Colors =====
-var COLOR_HEADER = "#111827";
-var COLOR_BUTTON = "#1F2937";
-var COLOR_SUBTITLE = "#9CA3AF";
-var COLOR_MUTED = "#6B7280";
-var COLOR_BOLD = "#111827";
-var COLOR_WHITE = "#FFFFFF";
+var COLOR_HEADER   = "#131c2e";
+var COLOR_SUBTITLE = "#a0b3cc";
+var COLOR_MUTED    = "#7a8ea6";
+var COLOR_BOLD     = "#111827";
+var COLOR_WHITE    = "#f0f4f8";
+var COLOR_OPEN     = "#1aad7c";
+var COLOR_CLOSED   = "#c95555";
+var COLOR_ACCENT   = "#93a0f8";
 
-// ===== Default Messages =====
-// All user-facing text. Editable via the Settings sheet (columns G-H); these are fallback defaults.
-// Placeholders: {name}, {time}, {reminder_minutes}, {count}
+// ===== Settings Label → Key Map =====
+var SETTINGS_MAP = {
+  "リマインダー（分）":   { type: "config", key: "reminder_minutes" },
+  "ログ表示件数":         { type: "config", key: "log_default_count" },
+  "ログ最大件数":         { type: "config", key: "log_max_count" },
+  "開けた時の返信":       { type: "msg",    key: "open_reply" },
+  "閉めた時の返信":       { type: "msg",    key: "close_reply" },
+  "リマインダー通知":     { type: "msg",    key: "reminder" },
+  "ウェルカム挨拶":       { type: "msg",    key: "welcome_greeting" },
+  "ウェルカム説明":       { type: "msg",    key: "welcome_desc" }
+};
+
+// ===== Checklist Condition Map =====
+var CHECKLIST_WHEN_MAP = {
+  "開ける時": "open",
+  "閉める時": "close",
+  "両方": "both"
+};
+
+// ===== Default Messages (only user-facing editable ones) =====
 var MESSAGE_DEFAULTS = {
-  // Command replies
-  open_reply:             "🔓 部室を【開けました】",
-  close_reply:            "🔒 部室を【閉めました】",
-  now_open:               "🔓 部室は現在【開いています】",
-  now_closed:             "🔒 部室は現在【閉まっています】\n（最終更新: {name} / {time}）",
-  now_unknown:            "状態不明",
-  reminder:               "⏰ {name}さん、部室が{reminder_minutes}分以上開いたままです。閉め忘れていませんか？",
-  no_pending:             "確認待ちのチェックリストはありません。",
-  // Log
-  log_title:              "📋 最近のログ ({count}件)",
-  log_empty:              "ログがありません。",
-  // Welcome Flex
-  welcome_title:          "🏠 Heimdall",
-  welcome_subtitle:       "部室カギ管理Bot",
-  welcome_greeting:       "K'issへようこそ！",
-  welcome_desc:           "このBotは部室のカギの開閉状態を管理・記録します。",
-  // Help Flex
-  help_title:             "📋 コマンド一覧",
-  // Command descriptions (used in Flex Messages)
-  cmd_open:               "部室を開ける",
-  cmd_close:              "部室を閉める",
-  cmd_now:                "現在の状態を確認",
-  cmd_help:               "コマンド一覧を表示",
-  cmd_log:                "最近のログを表示 (log 10)",
-  // Welcome Flex
-  welcome_help_hint:      "「help」と送信するとコマンド一覧を表示します。",
-  // Checklist Flex
-  checklist_close_title:  "📝 閉室時...",
-  checklist_open_title:   "📝 開室時...",
-  checklist_instruction:  "以下をすべて確認してください：",
-  checklist_confirm:      "全て確認しました",
-  // Button labels
-  btn_check_status:       "状態を確認する"
+  open_reply:        "🔓 部室を【開けました】",
+  close_reply:       "🔒 部室を【閉めました】",
+  reminder:          "⏰ {name}さん、部室が{reminder_minutes}分以上開いたままです。閉め忘れていませんか？",
+  welcome_greeting:  "K'issへようこそ！",
+  welcome_desc:      "このBotは部室のカギの開閉状態を管理・記録します。"
 };
 
 // ===== Entry Point =====
@@ -86,15 +80,12 @@ function handleWebhookEvent(event) {
     return;
   }
 
-  if (event.type !== "message" || event.message.type !== "text") {
-    return;
-  }
+  if (event.type !== "message" || event.message.type !== "text") return;
 
   var text = event.message.text.trim().toLowerCase();
   var replyToken = event.replyToken;
   var userId = event.source.userId;
 
-  // Handle commands with arguments (before switch)
   var logMatch = text.match(/^logs?(?: (\d+))?$/);
   if (logMatch) {
     handleLog(replyToken, logMatch[1] ? parseInt(logMatch[1], 10) : null);
@@ -102,26 +93,15 @@ function handleWebhookEvent(event) {
   }
 
   switch (text) {
-    case "open":
-      handleOpen(replyToken, userId);
-      break;
-    case "close":
-      handleClose(replyToken, userId);
-      break;
+    case "open":   handleOpen(replyToken, userId); break;
+    case "close":  handleClose(replyToken, userId); break;
     case "done":
-    case "checked":
-      handleCheckedConfirmation(replyToken, userId);
-      break;
-    case "now":
-      handleNow(replyToken);
-      break;
-    case "help":
-      handleHelp(replyToken);
-      break;
-    case "welcome":
-      replyFlex(replyToken, getMessage("welcome_title"), buildWelcomeFlex());
-      break;
+    case "checked": handleCheckedConfirmation(replyToken, userId); break;
+    case "now":    handleNow(replyToken); break;
+    case "help":   handleHelp(replyToken); break;
+    case "welcome": replyFlex(replyToken, "🏠 Heimdall", buildWelcomeFlex()); break;
     default:
+      replyMessage(replyToken, "そのコマンドは存在しません。「help」でコマンド一覧を確認できます。");
       break;
   }
 }
@@ -131,8 +111,7 @@ function handleWebhookEvent(event) {
 function handleFollow(replyToken, userId) {
   var displayName = getDisplayName(userId);
   addLog(userId, displayName, "follow");
-
-  replyFlex(replyToken, getMessage("welcome_title"), buildWelcomeFlex());
+  replyFlex(replyToken, "🏠 Heimdall", buildWelcomeFlex());
 }
 
 function handleOpen(replyToken, userId) {
@@ -142,8 +121,7 @@ function handleOpen(replyToken, userId) {
 
   if (items.length > 0) {
     props.setProperty(pendingKey, "open");
-    replyFlex(replyToken, getMessage("checklist_open_title"),
-      buildChecklistFlex(items, "open"));
+    replyFlex(replyToken, "📝 開室時チェック", buildChecklistFlex(items, "open"));
     return;
   }
 
@@ -158,8 +136,7 @@ function handleClose(replyToken, userId) {
 
   if (items.length > 0) {
     props.setProperty(pendingKey, "close");
-    replyFlex(replyToken, getMessage("checklist_close_title"),
-      buildChecklistFlex(items, "close"));
+    replyFlex(replyToken, "📝 閉室時チェック", buildChecklistFlex(items, "close"));
     return;
   }
 
@@ -173,7 +150,7 @@ function handleCheckedConfirmation(replyToken, userId) {
   var pending = props.getProperty(pendingKey);
 
   if (!pending) {
-    replyMessage(replyToken, getMessage("no_pending"));
+    replyMessage(replyToken, "確認待ちのチェックリストはありません。");
     return;
   }
 
@@ -200,7 +177,8 @@ function executeOpen(replyToken, userId) {
   PropertiesService.getScriptProperties().setProperty("last_opener_name", displayName);
   scheduleForgotToCloseReminder(userId);
 
-  replyMessage(replyToken, getMessage("open_reply", { name: displayName }));
+  var msg = getMessage("open_reply", { name: displayName });
+  replyFlex(replyToken, msg, buildActionReplyFlex("open", msg, displayName));
 }
 
 function executeClose(replyToken, userId) {
@@ -216,42 +194,37 @@ function executeClose(replyToken, userId) {
   PropertiesService.getScriptProperties().setProperty("last_closer_name", displayName);
   clearForgotToCloseTriggers();
 
-  replyMessage(replyToken, getMessage("close_reply", { name: displayName }));
+  var msg = getMessage("close_reply", { name: displayName });
+  replyFlex(replyToken, msg, buildActionReplyFlex("close", msg, displayName));
 }
 
 function handleNow(replyToken) {
   var status = getCurrentStatus();
-  var msg;
-
-  if (status.value === "OPEN") {
-    msg = getMessage("now_open");
-  } else if (status.value === "CLOSED") {
-    msg = getMessage("now_closed", { name: status.updatedBy || "", time: status.updatedAt || "" });
-  } else {
-    msg = getMessage("now_unknown");
-  }
-
-  replyMessage(replyToken, msg);
+  replyFlex(replyToken, "🏠 部室の状態", buildStatusFlex(status));
 }
 
 function handleHelp(replyToken) {
-  replyFlex(replyToken, getMessage("help_title"), buildHelpFlex());
+  replyFlex(replyToken, "📋 コマンド一覧", buildHelpFlex());
 }
 
 function handleLog(replyToken, count) {
-  if (!count) count = LOG_DEFAULT_COUNT;
-  count = Math.min(Math.max(1, count), LOG_MAX_COUNT);
+  var cfg = readSettings().config;
+  var defaultCount = parseInt(cfg.log_default_count, 10) || DEFAULT_LOG_COUNT;
+  var maxCount = parseInt(cfg.log_max_count, 10) || DEFAULT_LOG_MAX;
+
+  if (!count) count = defaultCount;
+  count = Math.min(Math.max(1, count), maxCount);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Data");
   if (!sheet) {
-    replyMessage(replyToken, getMessage("log_empty"));
+    replyMessage(replyToken, "ログがありません。");
     return;
   }
 
   var lastRow = sheet.getLastRow();
   if (lastRow < DATA_LOG_START_ROW) {
-    replyMessage(replyToken, getMessage("log_empty"));
+    replyMessage(replyToken, "ログがありません。");
     return;
   }
 
@@ -263,107 +236,130 @@ function handleLog(replyToken, count) {
   }
 
   if (logs.length === 0) {
-    replyMessage(replyToken, getMessage("log_empty"));
+    replyMessage(replyToken, "ログがありません。");
     return;
   }
 
   var recent = logs.slice(-count).reverse();
-  var lines = [getMessage("log_title", { count: recent.length }), "─────────────"];
-
+  var entries = [];
   for (var i = 0; i < recent.length; i++) {
-    var ts = recent[i][0];
-    var name = recent[i][2] || FALLBACK_DISPLAY_NAME;
-    var action = recent[i][3] || "";
-    var displayAction = action.replace("missed_close", "close").replace("missed_open", "open");
-    var dateStr = formatTimestamp(ts);
-    lines.push(dateStr + "  " + name + " — " + displayAction);
+    entries.push({
+      time: formatTimestamp(recent[i][0]),
+      name: recent[i][2] || FALLBACK_DISPLAY_NAME,
+      action: recent[i][3] || ""
+    });
   }
 
-  replyMessage(replyToken, lines.join("\n"));
+  replyFlex(replyToken, "📋 最近のログ", buildLogFlex(entries));
 }
 
 // ===== Flex Message Builders =====
 
 function buildWelcomeFlex() {
+  var status = getCurrentStatus();
+  var isOpen = status.value === "OPEN";
+  var statusEmoji = isOpen ? "🔓" : "🔒";
+  var statusText = isOpen ? "OPEN" : "CLOSED";
+  var statusColor = isOpen ? COLOR_OPEN : COLOR_CLOSED;
+  var updatedBy = status.updatedBy || "";
+  var updatedAt = status.updatedAt ? formatTimestamp(status.updatedAt) : "";
+  var statusLine = updatedBy ? (updatedBy + " / " + updatedAt) : "";
+
+  var bodyContents = [
+    { type: "text", text: getMessage("welcome_greeting"), weight: "bold", size: "md", wrap: true },
+    { type: "text", text: getMessage("welcome_desc"), size: "sm", color: COLOR_MUTED, wrap: true, margin: "md" },
+    { type: "separator", margin: "lg" }
+  ];
+
+  if (status.value === "OPEN" || status.value === "CLOSED") {
+    bodyContents.push({
+      type: "box", layout: "horizontal", margin: "lg", spacing: "sm",
+      contents: [
+        { type: "text", text: statusEmoji + " " + statusText, weight: "bold", size: "sm", color: statusColor, flex: 0 }
+      ]
+    });
+    if (statusLine) {
+      bodyContents.push({ type: "text", text: statusLine, size: "xs", color: COLOR_MUTED, margin: "xs" });
+    }
+  }
+
   return {
     type: "bubble",
     header: {
-      type: "box",
-      layout: "vertical",
-      backgroundColor: COLOR_HEADER,
-      paddingAll: "lg",
+      type: "box", layout: "vertical", backgroundColor: COLOR_HEADER, paddingAll: "lg",
       contents: [
-        { type: "text", text: getMessage("welcome_title"), weight: "bold", size: "xl", color: COLOR_WHITE },
-        { type: "text", text: getMessage("welcome_subtitle"), size: "sm", color: COLOR_SUBTITLE, margin: "sm" }
+        { type: "text", text: "🏠 Heimdall", weight: "bold", size: "xl", color: COLOR_WHITE },
+        { type: "text", text: "部室カギ管理Bot", size: "sm", color: COLOR_SUBTITLE, margin: "sm" }
       ]
     },
     body: {
-      type: "box",
-      layout: "vertical",
-      spacing: "md",
-      paddingAll: "lg",
-      contents: [
-        { type: "text", text: getMessage("welcome_greeting"), weight: "bold", size: "md", wrap: true },
-        { type: "text", text: getMessage("welcome_desc"), size: "sm", color: COLOR_MUTED, wrap: true, margin: "md" },
-        { type: "separator", margin: "lg" },
-        { type: "text", text: getMessage("welcome_help_hint"), size: "sm", color: COLOR_MUTED, wrap: true, margin: "lg" }
-      ]
+      type: "box", layout: "vertical", spacing: "md", paddingAll: "lg",
+      contents: bodyContents
     },
     footer: {
-      type: "box",
-      layout: "vertical",
+      type: "box", layout: "vertical", spacing: "sm",
       contents: [
         {
-          type: "button",
-          style: "primary",
-          color: COLOR_BUTTON,
-          action: { type: "message", label: getMessage("btn_check_status"), text: "now" }
-        }
+          type: "box", layout: "horizontal", spacing: "sm",
+          contents: [
+            { type: "button", style: "primary", color: COLOR_OPEN, action: { type: "message", label: "🔓 Open", text: "open" } },
+            { type: "button", style: "primary", color: COLOR_CLOSED, action: { type: "message", label: "🔒 Close", text: "close" } }
+          ]
+        },
+        { type: "button", style: "link", color: COLOR_MUTED, action: { type: "message", label: "📋 Help", text: "help" } }
       ]
     }
   };
 }
 
 function buildHelpFlex() {
+  var cmds = [
+    ["open",  "部室を開ける"],
+    ["close", "部室を閉める"],
+    ["now",   "現在の状態を確認"],
+    ["help",  "コマンド一覧を表示"],
+    ["log",   "最近のログを表示"]
+  ];
+
+  var rows = [];
+  for (var i = 0; i < cmds.length; i++) {
+    rows.push({
+      type: "box", layout: "horizontal", margin: "md",
+      action: { type: "message", label: cmds[i][0], text: cmds[i][0] },
+      contents: [
+        { type: "text", text: cmds[i][0], size: "sm", weight: "bold", flex: 2, color: COLOR_ACCENT },
+        { type: "text", text: cmds[i][1], size: "sm", flex: 5, color: COLOR_MUTED, wrap: true }
+      ]
+    });
+  }
+
   return {
     type: "bubble",
     header: {
-      type: "box",
-      layout: "vertical",
-      backgroundColor: COLOR_HEADER,
-      paddingAll: "lg",
+      type: "box", layout: "vertical", backgroundColor: COLOR_HEADER, paddingAll: "lg",
       contents: [
-        { type: "text", text: getMessage("help_title"), weight: "bold", size: "lg", color: COLOR_WHITE }
+        { type: "text", text: "📋 コマンド一覧", weight: "bold", size: "lg", color: COLOR_WHITE }
       ]
     },
     body: {
-      type: "box",
-      layout: "vertical",
-      spacing: "md",
-      paddingAll: "lg",
-      contents: [
-        buildCommandRow("open", getMessage("cmd_open")),
-        buildCommandRow("close", getMessage("cmd_close")),
-        buildCommandRow("now", getMessage("cmd_now")),
-        buildCommandRow("help", getMessage("cmd_help")),
-        buildCommandRow("log", getMessage("cmd_log"))
-      ]
+      type: "box", layout: "vertical", spacing: "md", paddingAll: "lg",
+      contents: rows
     }
   };
 }
 
 function buildChecklistFlex(items, operation) {
-  var titleKey = operation === "open" ? "checklist_open_title" : "checklist_close_title";
+  var isOpen = operation === "open";
+  var title = isOpen ? "📝 開室時..." : "📝 閉室時...";
+  var btnColor = isOpen ? COLOR_OPEN : COLOR_CLOSED;
 
   var bodyContents = [
-    { type: "text", text: getMessage("checklist_instruction"), size: "sm", color: COLOR_MUTED, wrap: true }
+    { type: "text", text: "以下をすべて確認してください：", size: "sm", color: COLOR_MUTED, wrap: true }
   ];
 
   for (var i = 0; i < items.length; i++) {
     bodyContents.push({
-      type: "box",
-      layout: "horizontal",
-      margin: "md",
+      type: "box", layout: "horizontal", margin: "md",
       contents: [
         { type: "text", text: "☐", size: "md", flex: 0, color: COLOR_MUTED },
         { type: "text", text: items[i], size: "md", wrap: true, margin: "sm", flex: 5 }
@@ -374,45 +370,168 @@ function buildChecklistFlex(items, operation) {
   return {
     type: "bubble",
     header: {
-      type: "box",
-      layout: "vertical",
-      backgroundColor: COLOR_HEADER,
-      paddingAll: "lg",
+      type: "box", layout: "vertical", backgroundColor: COLOR_HEADER, paddingAll: "lg",
       contents: [
-        { type: "text", text: getMessage(titleKey), weight: "bold", size: "lg", color: COLOR_WHITE }
+        { type: "text", text: title, weight: "bold", size: "lg", color: COLOR_WHITE }
       ]
     },
     body: {
-      type: "box",
-      layout: "vertical",
-      spacing: "sm",
-      paddingAll: "lg",
+      type: "box", layout: "vertical", spacing: "sm", paddingAll: "lg",
       contents: bodyContents
     },
     footer: {
-      type: "box",
-      layout: "vertical",
+      type: "box", layout: "vertical",
       contents: [
-        {
-          type: "button",
-          style: "primary",
-          color: COLOR_BUTTON,
-          action: { type: "message", label: getMessage("checklist_confirm"), text: "done" }
-        }
+        { type: "button", style: "primary", color: btnColor, action: { type: "message", label: "全て確認しました", text: "done" } }
       ]
     }
   };
 }
 
-function buildCommandRow(cmd, desc) {
+function buildStatusFlex(status) {
+  var isOpen = status.value === "OPEN";
+  var isClosed = status.value === "CLOSED";
+  var emoji = isOpen ? "🔓" : "🔒";
+  var statusText = isOpen ? "OPEN" : (isClosed ? "CLOSED" : "UNKNOWN");
+  var statusColor = isOpen ? COLOR_OPEN : (isClosed ? COLOR_CLOSED : COLOR_MUTED);
+  var updatedBy = status.updatedBy || FALLBACK_DISPLAY_NAME;
+  var updatedAt = status.updatedAt ? formatTimestamp(status.updatedAt) : "—";
+
+  var bodyContents = [
+    { type: "text", text: emoji + " " + statusText, weight: "bold", size: "xl", color: statusColor, align: "center" },
+    { type: "separator", margin: "lg" },
+    {
+      type: "box", layout: "horizontal", margin: "md",
+      contents: [
+        { type: "text", text: "更新者", size: "xs", color: COLOR_MUTED, flex: 1 },
+        { type: "text", text: updatedBy, size: "sm", weight: "bold", flex: 2, align: "end" }
+      ]
+    },
+    {
+      type: "box", layout: "horizontal",
+      contents: [
+        { type: "text", text: "更新日時", size: "xs", color: COLOR_MUTED, flex: 1 },
+        { type: "text", text: updatedAt, size: "sm", flex: 2, align: "end" }
+      ]
+    }
+  ];
+
+  var footerContents = [];
+  if (isOpen) {
+    footerContents.push({ type: "button", style: "primary", color: COLOR_CLOSED, action: { type: "message", label: "🔒 Close", text: "close" } });
+  } else if (isClosed) {
+    footerContents.push({ type: "button", style: "primary", color: COLOR_OPEN, action: { type: "message", label: "🔓 Open", text: "open" } });
+  }
+  footerContents.push({ type: "button", style: "link", color: COLOR_MUTED, action: { type: "message", label: "📋 ログを見る", text: "log" } });
+
   return {
-    type: "box",
-    layout: "horizontal",
-    margin: "md",
-    contents: [
-      { type: "text", text: cmd, size: "sm", weight: "bold", flex: 2, color: COLOR_BOLD },
-      { type: "text", text: desc, size: "sm", flex: 5, color: COLOR_MUTED, wrap: true }
-    ]
+    type: "bubble",
+    header: {
+      type: "box", layout: "vertical", backgroundColor: COLOR_HEADER, paddingAll: "lg",
+      contents: [
+        { type: "text", text: "🏠 部室の状態", weight: "bold", size: "lg", color: COLOR_WHITE }
+      ]
+    },
+    body: {
+      type: "box", layout: "vertical", spacing: "md", paddingAll: "lg",
+      contents: bodyContents
+    },
+    footer: {
+      type: "box", layout: "vertical", spacing: "sm",
+      contents: footerContents
+    }
+  };
+}
+
+function buildLogFlex(entries) {
+  var rows = [];
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    var action = e.action.replace("missed_close", "close").replace("missed_open", "open");
+    var icon = "📝";
+    var actionColor = COLOR_ACCENT;
+
+    if (action === "open") {
+      icon = "🔓";
+      actionColor = COLOR_OPEN;
+    } else if (action === "close") {
+      icon = "🔒";
+      actionColor = COLOR_CLOSED;
+    } else if (action === "follow") {
+      icon = "👋";
+    }
+
+    rows.push({
+      type: "box", layout: "horizontal", spacing: "md", margin: i > 0 ? "sm" : "none",
+      contents: [
+        { type: "text", text: icon, size: "sm", flex: 0 },
+        { type: "text", text: e.name, size: "sm", weight: "bold", flex: 2 },
+        { type: "text", text: action, size: "sm", color: actionColor, flex: 2 },
+        { type: "text", text: e.time, size: "xs", color: COLOR_MUTED, flex: 3, align: "end" }
+      ]
+    });
+  }
+
+  return {
+    type: "bubble",
+    header: {
+      type: "box", layout: "vertical", backgroundColor: COLOR_HEADER, paddingAll: "lg",
+      contents: [
+        { type: "text", text: "📋 最近のログ", weight: "bold", size: "md", color: COLOR_WHITE }
+      ]
+    },
+    body: {
+      type: "box", layout: "vertical", spacing: "sm", paddingAll: "lg",
+      contents: rows
+    }
+  };
+}
+
+function buildActionReplyFlex(action, message, displayName) {
+  var isOpen = action === "open";
+  var emoji = isOpen ? "🔓" : "🔒";
+  var statusText = isOpen ? "OPEN" : "CLOSED";
+  var accentColor = isOpen ? COLOR_OPEN : COLOR_CLOSED;
+  var oppositeLabel = isOpen ? "🔒 Close" : "🔓 Open";
+  var oppositeCmd = isOpen ? "close" : "open";
+  var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), TIMESTAMP_FORMAT);
+
+  return {
+    type: "bubble",
+    header: {
+      type: "box", layout: "vertical", backgroundColor: COLOR_HEADER, paddingAll: "lg",
+      contents: [
+        { type: "text", text: message, weight: "bold", size: "md", color: COLOR_WHITE, wrap: true }
+      ]
+    },
+    body: {
+      type: "box", layout: "vertical", spacing: "md", paddingAll: "lg",
+      contents: [
+        { type: "text", text: emoji + " " + statusText, weight: "bold", size: "xl", color: accentColor, align: "center" },
+        { type: "separator", margin: "lg" },
+        {
+          type: "box", layout: "horizontal", margin: "md",
+          contents: [
+            { type: "text", text: "操作者", size: "xs", color: COLOR_MUTED, flex: 1 },
+            { type: "text", text: displayName, size: "sm", weight: "bold", flex: 2, align: "end" }
+          ]
+        },
+        {
+          type: "box", layout: "horizontal",
+          contents: [
+            { type: "text", text: "時刻", size: "xs", color: COLOR_MUTED, flex: 1 },
+            { type: "text", text: now, size: "sm", flex: 2, align: "end" }
+          ]
+        }
+      ]
+    },
+    footer: {
+      type: "box", layout: "vertical", spacing: "sm",
+      contents: [
+        { type: "button", style: "primary", color: accentColor, action: { type: "message", label: oppositeLabel, text: oppositeCmd } },
+        { type: "button", style: "link", color: COLOR_MUTED, action: { type: "message", label: "📋 ログを見る", text: "log" } }
+      ]
+    }
   };
 }
 
@@ -425,9 +544,45 @@ function formatTimestamp(ts) {
   return String(ts);
 }
 
+// ===== Settings Reader =====
+
+var _settingsCache = null;
+
+function readSettings() {
+  if (_settingsCache) return _settingsCache;
+
+  var result = { config: {}, messages: {} };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("設定");
+  if (!sheet) return result;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return result;
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  for (var i = 0; i < data.length; i++) {
+    var label = String(data[i][0]).trim();
+    var value = String(data[i][1]);
+    var mapping = SETTINGS_MAP[label];
+    if (!mapping) continue;
+
+    if (mapping.type === "config") {
+      result.config[mapping.key] = value;
+    } else if (mapping.type === "msg") {
+      result.messages[mapping.key] = value;
+    }
+  }
+
+  _settingsCache = result;
+  return result;
+}
+
+function getConfig(key) {
+  return readSettings().config[key] || null;
+}
+
 // ===== Message Loader =====
 
-var _messagesCache = null;
 var _globalReplacementsCache = null;
 
 function getGlobalReplacements() {
@@ -443,22 +598,23 @@ function getGlobalReplacements() {
 }
 
 function getMessage(key, replacements) {
-  var msg = readMessageFromSheet(key);
-  if (msg === null) {
+  var settings = readSettings();
+  var msg = settings.messages[key];
+  if (msg === undefined || msg === null) {
     msg = MESSAGE_DEFAULTS[key] !== undefined ? MESSAGE_DEFAULTS[key] : key;
   }
 
-  // Convert literal \n typed in sheet cells to real newlines
+  // Convert literal \n to real newlines
   msg = msg.replace(/\\n/g, "\n");
 
-  // Explicit replacements first (take priority)
+  // Explicit replacements first
   if (replacements) {
     for (var k in replacements) {
       msg = msg.replace(new RegExp("\\{" + k + "\\}", "g"), String(replacements[k] || ""));
     }
   }
 
-  // Global replacements for any remaining placeholders
+  // Global replacements for remaining placeholders
   var globals = getGlobalReplacements();
   for (var k in globals) {
     msg = msg.replace(new RegExp("\\{" + k + "\\}", "g"), String(globals[k] || ""));
@@ -467,46 +623,23 @@ function getMessage(key, replacements) {
   return msg;
 }
 
-function readMessageFromSheet(key) {
-  if (!_messagesCache) {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Settings");
-    _messagesCache = {};
-    if (!sheet) return null;
-    var lastRow = sheet.getLastRow();
-    if (lastRow < 2) return null;
-    var data = sheet.getRange(2, 7, lastRow - 1, 2).getValues();
-    for (var i = 0; i < data.length; i++) {
-      var k = String(data[i][0]).trim();
-      var v = String(data[i][1]);
-      if (k) _messagesCache[k] = v;
-    }
-  }
-  return _messagesCache.hasOwnProperty(key) ? _messagesCache[key] : null;
-}
-
 // ===== Checklist Loader =====
 
-/**
- * Reads checklist items for the given operation ("open" or "close").
- * Settings sheet columns D-E: item, when (open/close/both).
- * If "when" column is empty, defaults to "close".
- */
 function getChecklistItems(operation) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Settings");
+  var sheet = ss.getSheetByName("チェックリスト");
   if (!sheet) return [];
 
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
 
-  var data = sheet.getRange(2, 4, lastRow - 1, 2).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
   var items = [];
   for (var i = 0; i < data.length; i++) {
     var item = String(data[i][0]).trim();
     if (!item) continue;
-    var when = String(data[i][1] || "").trim().toLowerCase();
-    if (!when) when = "close";
+    var whenJa = String(data[i][1] || "").trim();
+    var when = CHECKLIST_WHEN_MAP[whenJa] || "close";
     if (when === operation || when === "both") {
       items.push(item);
     }
@@ -549,23 +682,6 @@ function clearForgotToCloseTriggers() {
   }
 }
 
-// ===== Config Loader =====
-
-function getConfig(key) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Settings");
-  if (!sheet) return null;
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return null;
-
-  var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
-  for (var i = 0; i < data.length; i++) {
-    if (String(data[i][0]).trim() === key) return String(data[i][1]);
-  }
-  return null;
-}
-
 // ===== Sheet Helpers =====
 
 function getCurrentStatus() {
@@ -593,69 +709,86 @@ function addLog(userId, displayName, action) {
   sheet.appendRow([new Date(), userId, displayName, action]);
 }
 
+// ===== Sheet Structure (Non-Destructive) =====
+
 function ensureSheetStructure() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // ---- Settings sheet ----
-  var settings = ss.getSheetByName("Settings");
-  if (!settings) settings = ss.insertSheet("Settings");
-  if (String(settings.getRange(1, 1).getValue()).trim() !== "設定") {
+  // ---- 設定 tab ----
+  var settings = ss.getSheetByName("設定");
+  if (!settings) {
+    settings = ss.insertSheet("設定");
     initSettingsSheet(settings);
   }
 
-  // ---- Data sheet ----
+  // ---- チェックリスト tab ----
+  var checklist = ss.getSheetByName("チェックリスト");
+  if (!checklist) {
+    checklist = ss.insertSheet("チェックリスト");
+    initChecklistSheet(checklist);
+  }
+
+  // ---- Data tab ----
   var dataSheet = ss.getSheetByName("Data");
-  if (!dataSheet) dataSheet = ss.insertSheet("Data");
-  if (String(dataSheet.getRange(1, 1).getValue()).trim() !== "状態") {
+  if (!dataSheet) {
+    dataSheet = ss.insertSheet("Data");
     initDataSheet(dataSheet);
   }
 }
 
 function initSettingsSheet(sheet) {
-  sheet.clearContents();
+  // Config section
+  sheet.getRange(1, 1, 1, 3).setValues([["設定項目", "値", "説明"]]);
+  sheet.getRange(1, 1, 1, 3).setFontWeight("bold");
 
-  // Row 1: Section headers
-  sheet.getRange(1, 1, 1, 11).setValues([[
-    "設定", "値", "",
-    "チェック項目", "条件", "",
-    "キー", "メッセージ", "",
-    "変数名", "説明"
-  ]]);
-  sheet.getRange(1, 1, 1, 11).setFontWeight("bold");
-
-  // Config defaults (A2:B2)
-  sheet.getRange(2, 1, 1, 2).setValues([
-    ["reminder_minutes", DEFAULT_REMINDER_MINUTES]
+  sheet.getRange(2, 1, 3, 3).setValues([
+    ["リマインダー（分）", DEFAULT_REMINDER_MINUTES, "開けたまま放置した時の通知までの時間"],
+    ["ログ表示件数",       DEFAULT_LOG_COUNT,         "「log」コマンドのデフォルト表示件数"],
+    ["ログ最大件数",       DEFAULT_LOG_MAX,           "「log N」の最大値"]
   ]);
 
-  // Checklist defaults (D2:E5)
-  sheet.getRange(2, 4, 4, 2).setValues([
-    ["タスク1", "close"],
-    ["タスク2", "close"],
-    ["タスク3", "open"],
-    ["タスク4", "open"]
+  // Spacer row 5
+  // Custom text section
+  sheet.getRange(6, 1, 1, 3).setValues([["カスタムテキスト", "テキスト", "説明"]]);
+  sheet.getRange(6, 1, 1, 3).setFontWeight("bold");
+
+  sheet.getRange(7, 1, 5, 3).setValues([
+    ["開けた時の返信",   MESSAGE_DEFAULTS.open_reply,        "{name}でユーザー名を挿入"],
+    ["閉めた時の返信",   MESSAGE_DEFAULTS.close_reply,       "{name}でユーザー名を挿入"],
+    ["リマインダー通知", MESSAGE_DEFAULTS.reminder,          "閉め忘れ通知。{name}=名前, {reminder_minutes}=分"],
+    ["ウェルカム挨拶",   MESSAGE_DEFAULTS.welcome_greeting,  "友達追加時の挨拶文"],
+    ["ウェルカム説明",   MESSAGE_DEFAULTS.welcome_desc,      "友達追加時の説明文"]
   ]);
 
-  // Message defaults (G2:H(n))
-  var msgKeys = Object.keys(MESSAGE_DEFAULTS);
-  var msgData = [];
-  for (var i = 0; i < msgKeys.length; i++) {
-    msgData.push([msgKeys[i], MESSAGE_DEFAULTS[msgKeys[i]]]);
-  }
-  sheet.getRange(2, 7, msgData.length, 2).setValues(msgData);
+  // Column widths
+  sheet.setColumnWidth(1, 180);
+  sheet.setColumnWidth(2, 300);
+  sheet.setColumnWidth(3, 280);
+}
 
-  // Variables reference (J2:L(n))
-  writeVariablesReference(sheet);
+function initChecklistSheet(sheet) {
+  sheet.getRange(1, 1, 1, 2).setValues([["チェック項目", "いつ"]]);
+  sheet.getRange(1, 1, 1, 2).setFontWeight("bold");
 
-  // Narrow spacer columns
-  sheet.setColumnWidth(3, 20);
-  sheet.setColumnWidth(6, 20);
-  sheet.setColumnWidth(9, 20);
+  sheet.getRange(2, 1, 4, 2).setValues([
+    ["タスク1", "閉める時"],
+    ["タスク2", "閉める時"],
+    ["タスク3", "開ける時"],
+    ["タスク4", "開ける時"]
+  ]);
+
+  // Data validation dropdown on column B
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["開ける時", "閉める時", "両方"], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, 2, 100, 1).setDataValidation(rule);
+
+  sheet.setColumnWidth(1, 250);
+  sheet.setColumnWidth(2, 120);
 }
 
 function initDataSheet(sheet) {
-  sheet.clearContents();
-
   // Row 1: Status
   sheet.getRange(1, 1, 1, 4).setValues([["状態", "CLOSED", "", ""]]);
   sheet.getRange(1, 1).setFontWeight("bold");
@@ -668,44 +801,38 @@ function initDataSheet(sheet) {
 // ===== LINE API Helpers =====
 
 function replyMessage(replyToken, text) {
-  var payload = {
-    replyToken: replyToken,
-    messages: [{ type: "text", text: text }]
-  };
-
   UrlFetchApp.fetch(LINE_REPLY_URL, {
     method: "post",
     contentType: "application/json",
     headers: { Authorization: "Bearer " + LINE_CHANNEL_ACCESS_TOKEN },
-    payload: JSON.stringify(payload)
+    payload: JSON.stringify({
+      replyToken: replyToken,
+      messages: [{ type: "text", text: text }]
+    })
   });
 }
 
 function replyFlex(replyToken, altText, flexContents) {
-  var payload = {
-    replyToken: replyToken,
-    messages: [{ type: "flex", altText: altText, contents: flexContents }]
-  };
-
   UrlFetchApp.fetch(LINE_REPLY_URL, {
     method: "post",
     contentType: "application/json",
     headers: { Authorization: "Bearer " + LINE_CHANNEL_ACCESS_TOKEN },
-    payload: JSON.stringify(payload)
+    payload: JSON.stringify({
+      replyToken: replyToken,
+      messages: [{ type: "flex", altText: altText, contents: flexContents }]
+    })
   });
 }
 
 function pushMessage(userId, text) {
-  var payload = {
-    to: userId,
-    messages: [{ type: "text", text: text }]
-  };
-
   UrlFetchApp.fetch(LINE_PUSH_URL, {
     method: "post",
     contentType: "application/json",
     headers: { Authorization: "Bearer " + LINE_CHANNEL_ACCESS_TOKEN },
-    payload: JSON.stringify(payload)
+    payload: JSON.stringify({
+      to: userId,
+      messages: [{ type: "text", text: text }]
+    })
   });
 }
 
@@ -722,76 +849,9 @@ function getDisplayName(userId) {
   }
 }
 
-// ===== Setup =====
+// ===== Setup (Non-Destructive) =====
 
 function setup() {
   ensureSheetStructure();
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var settings = ss.getSheetByName("Settings");
-
-  // Refresh variables reference (always regenerate, clear 3 cols to clean up old 対象キー)
-  var lastRow = settings.getLastRow();
-  if (lastRow >= 1) {
-    var clearRows = Math.max(lastRow, 1);
-    settings.getRange(1, 12, clearRows, 1).clearContent();
-  }
-  if (lastRow >= 2) {
-    settings.getRange(2, 10, lastRow - 1, 2).clearContent();
-  }
-  writeVariablesReference(settings);
-
-  // Add missing message keys without overwriting existing ones
-  lastRow = settings.getLastRow();
-  var msgColData = lastRow >= 2 ? settings.getRange(2, 7, lastRow - 1, 1).getValues() : [];
-  var existing = {};
-  var lastMsgRow = 1;
-  for (var i = 0; i < msgColData.length; i++) {
-    var k = String(msgColData[i][0]).trim();
-    if (k) {
-      existing[k] = true;
-      lastMsgRow = i + 2;
-    }
-  }
-  var msgKeys = Object.keys(MESSAGE_DEFAULTS);
-  var missing = [];
-  for (var i = 0; i < msgKeys.length; i++) {
-    if (!existing[msgKeys[i]]) {
-      missing.push([msgKeys[i], MESSAGE_DEFAULTS[msgKeys[i]]]);
-    }
-  }
-  if (missing.length > 0) {
-    settings.getRange(lastMsgRow + 1, 7, missing.length, 2).setValues(missing);
-  }
-
-  // Clean up old sheets from previous versions
-  var oldNames = ["Status", "Logs", "Config", "Checklist", "Messages", "Variables", "Sheet1", "シート1"];
-  for (var i = 0; i < oldNames.length; i++) {
-    var old = ss.getSheetByName(oldNames[i]);
-    if (old) {
-      try { ss.deleteSheet(old); } catch (e) {}
-    }
-  }
-
-  Logger.log("Setup complete. Settings sheet and Data sheet are ready.");
-}
-
-/**
- * Writes the variables reference (in Japanese) to the Settings sheet, columns J-L.
- */
-function writeVariablesReference(sheet) {
-  var vars = [
-    ["{name}", "操作したユーザーの表示名"],
-    ["{time}", "最終更新の日時"],
-    ["{reminder_minutes}", "リマインダー時間（分）"],
-    ["{count}", "表示ログ件数"],
-    ["{last_opener}", "最後に開けた人の名前"],
-    ["{last_closer}", "最後に閉めた人の名前"],
-    ["", ""],
-    ["── チェック条件 ──", ""],
-    ["open", "開室時のみ表示"],
-    ["close", "閉室時のみ（デフォルト）"],
-    ["both", "両方で表示"]
-  ];
-  sheet.getRange(2, 10, vars.length, 2).setValues(vars);
+  Logger.log("Setup complete. Tabs: 設定, チェックリスト, Data.");
 }

@@ -28,5 +28,8 @@ MASTER.md
 PLAN.md
 PLAN_PROMPT.md
 
+# Trash
+trash/
+
 # Claude Code
 .claude/
